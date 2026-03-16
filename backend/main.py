@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 
 from core.config import settings
-from api.routes import auth, health, repositories, vulnerabilities, agents, github
+from api.routes import auth, health, repositories, vulnerabilities, agents, github, webhooks
 from core.database import init_db
 
 logger = structlog.get_logger()
@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(github.router, prefix="/auth/github", tags=["GitHub Integration"])
+app.include_router(webhooks.router, prefix="/webhooks/github", tags=["GitHub Webhooks"])
 app.include_router(repositories.router, prefix="/repositories", tags=["Repositories"])
 app.include_router(vulnerabilities.router, prefix="/vulnerabilities", tags=["Vulnerabilities"])
 app.include_router(agents.router, prefix="/agents", tags=["Agents"])

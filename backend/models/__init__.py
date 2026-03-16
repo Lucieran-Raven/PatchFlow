@@ -69,9 +69,16 @@ class Repository(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Webhook fields
+    webhook_id = Column(String(255), nullable=True)
+    webhook_secret = Column(String(255), nullable=True)
+    webhook_url = Column(String(500), nullable=True)
+    webhook_events = Column(JSON, default=list)
+    
     owner = relationship("User", back_populates="repositories")
     organization = relationship("Organization", back_populates="repositories")
     vulnerabilities = relationship("Vulnerability", back_populates="repository", lazy="dynamic")
+    webhook_events_received = relationship("WebhookEvent", back_populates="repository", lazy="dynamic")
 
 class Vulnerability(Base):
     __tablename__ = "vulnerabilities"
@@ -117,3 +124,36 @@ class Vulnerability(Base):
     closed_at = Column(DateTime, nullable=True)
     
     repository = relationship("Repository", back_populates="vulnerabilities")
+
+class WebhookEvent(Base):
+    __tablename__ = "webhook_events"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    repository_id = Column(String(36), ForeignKey("repositories.id"), nullable=False, index=True)
+    
+    # GitHub webhook data
+    event_type = Column(String(100), nullable=False, index=True)  # push, pull_request, etc.
+    delivery_id = Column(String(255), unique=True, nullable=True)  # X-GitHub-Delivery header
+    payload = Column(JSON, default=dict)  # Full webhook payload
+    
+    # Event details
+    action = Column(String(100), nullable=True)  # e.g., "opened", "synchronize", "closed"
+    ref = Column(String(255), nullable=True)  # Git ref (e.g., refs/heads/main)
+    before_commit = Column(String(100), nullable=True)  # Previous commit SHA
+    after_commit = Column(String(100), nullable=True)  # New commit SHA
+    pusher_name = Column(String(255), nullable=True)
+    pusher_email = Column(String(255), nullable=True)
+    commit_message = Column(Text, nullable=True)
+    
+    # Processing status
+    status = Column(String(50), default="pending", index=True)  # pending, processing, completed, failed
+    processed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    scan_triggered = Column(Boolean, default=False)
+    
+    # Timestamps
+    received_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    repository = relationship("Repository", back_populates="webhook_events_received")
+
