@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Shield, Zap, Clock, CheckCircle, ArrowRight, Github, Slack, Lock } from "lucide-react"
+import { GitHubLoginButton } from "@/components/auth/github-login-button"
 
 export default function Home() {
   return (
@@ -18,8 +19,7 @@ export default function Home() {
               <a href="#features" className="text-slate-600 hover:text-slate-900">Features</a>
               <a href="#how-it-works" className="text-slate-600 hover:text-slate-900">How It Works</a>
               <a href="#pricing" className="text-slate-600 hover:text-slate-900">Pricing</a>
-              <Button variant="outline" className="border-slate-300">Sign In</Button>
-              <Button className="bg-indigo-600 hover:bg-indigo-700">Get Started</Button>
+              <GitHubLoginButton />
             </div>
           </div>
         </div>

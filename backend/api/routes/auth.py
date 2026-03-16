@@ -49,16 +49,22 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
 async def get_current_user(
-    token: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db)
 ) -> User:
+    """Get current user from JWT token in Authorization header."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        token = credentials.credentials
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
@@ -112,11 +118,6 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/github/callback")
-async def github_callback(code: str, db: AsyncSession = Depends(get_db)):
-    """Handle GitHub OAuth callback."""
-    # TODO: Implement GitHub OAuth
-    return {"message": "GitHub OAuth callback - implementation pending"}
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):

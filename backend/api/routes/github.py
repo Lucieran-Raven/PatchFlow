@@ -9,7 +9,7 @@ from models import User, Repository
 from api.routes.auth import create_access_token, get_current_user as get_current_user_from_token
 import secrets
 
-router = APIRouter(prefix="/github", tags=["GitHub Integration"])
+router = APIRouter(tags=["GitHub Integration"])
 
 # In-memory state storage (use Redis in production)
 oauth_states = {}
@@ -27,7 +27,7 @@ async def github_login():
     
     params = {
         "client_id": settings.GITHUB_CLIENT_ID,
-        "redirect_uri": f"{settings.FRONTEND_URL}/auth/github/callback",
+        "redirect_uri": "http://localhost:8000/auth/github/callback",
         "scope": "repo read:user read:org",
         "state": state
     }
@@ -57,7 +57,7 @@ async def github_callback(
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "client_secret": settings.GITHUB_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": f"{settings.FRONTEND_URL}/auth/github/callback"
+                "redirect_uri": "http://localhost:8000/auth/github/callback"
             }
         )
         
@@ -114,7 +114,7 @@ async def github_callback(
         await db.commit()
     
     # Create JWT token
-    jwt_token = create_access_token({"sub": str(user.id)})
+    jwt_token = create_access_token({"sub": user.email})
     
     # Redirect to frontend with token
     return RedirectResponse(
