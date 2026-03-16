@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://patchflow.ai"]
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # GitHub
     GITHUB_CLIENT_ID: str = ""
