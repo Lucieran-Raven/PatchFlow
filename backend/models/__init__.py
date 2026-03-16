@@ -79,12 +79,14 @@ class Repository(Base):
     organization = relationship("Organization", back_populates="repositories")
     vulnerabilities = relationship("Vulnerability", back_populates="repository", lazy="dynamic")
     webhook_events_received = relationship("WebhookEvent", back_populates="repository", lazy="dynamic")
+    scan_jobs = relationship("ScanJob", back_populates="repository", lazy="dynamic")
 
 class Vulnerability(Base):
     __tablename__ = "vulnerabilities"
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     repository_id = Column(String(36), ForeignKey("repositories.id"), nullable=False, index=True)
+    scan_job_id = Column(String(36), ForeignKey("scan_jobs.id"), nullable=True, index=True)
     
     # Vulnerability details
     cve_id = Column(String(50), nullable=True, index=True)
@@ -124,6 +126,7 @@ class Vulnerability(Base):
     closed_at = Column(DateTime, nullable=True)
     
     repository = relationship("Repository", back_populates="vulnerabilities")
+    scan_job = relationship("ScanJob", back_populates="vulnerabilities")
 
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"
@@ -157,3 +160,34 @@ class WebhookEvent(Base):
     
     repository = relationship("Repository", back_populates="webhook_events_received")
 
+class ScanJob(Base):
+    __tablename__ = "scan_jobs"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    repository_id = Column(String(36), ForeignKey("repositories.id"), nullable=False, index=True)
+    
+    # Scan configuration
+    trigger_type = Column(String(50), nullable=False)  # webhook, manual, scheduled
+    branch = Column(String(100), default="main")
+    scanners_used = Column(JSON, default=list)  # ['trivy', 'github_advisory']
+    
+    # Scan status
+    status = Column(String(50), default="queued", index=True)  # queued, running, completed, failed
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    
+    # Scan results summary
+    total_findings = Column(Integer, default=0)
+    critical_count = Column(Integer, default=0)
+    high_count = Column(Integer, default=0)
+    medium_count = Column(Integer, default=0)
+    low_count = Column(Integer, default=0)
+    
+    # Raw scan data
+    scan_results = Column(JSON, default=dict)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    repository = relationship("Repository", back_populates="scan_jobs")
+    vulnerabilities = relationship("Vulnerability", back_populates="scan_job", lazy="dynamic")

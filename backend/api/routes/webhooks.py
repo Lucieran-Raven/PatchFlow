@@ -115,29 +115,115 @@ async def github_webhook(
 
 
 async def trigger_repository_scan(repo_id: str, commit_sha: str, db: AsyncSession):
-    """Trigger a security scan for a repository."""
-    try:
-        logger.info("Starting repository scan", repo_id=repo_id, commit_sha=commit_sha)
-        
-        # TODO: Implement actual scanning logic
-        # This would:
-        # 1. Clone the repository
-        # 2. Run Snyk/Trivy/dependency check
-        # 3. Create Vulnerability records
-        # 4. Trigger AI triage
-        
-        # For now, just update the timestamp
-        result = await db.execute(select(Repository).where(Repository.id == repo_id))
-        repo = result.scalar_one_or_none()
-        if repo:
-            from datetime import datetime
+    """Trigger a security scan for a repository using the scan orchestrator."""
+    from services.scanner_service import scan_orchestrator, Severity
+    from models import ScanJob, Vulnerability
+    from datetime import datetime
+    from core.database import async_session_maker
+    import asyncio
+    
+    # Create new session for async background task
+    async with async_session_maker() as session:
+        try:
+            logger.info("Starting repository scan", repo_id=repo_id, commit_sha=commit_sha)
+            
+            # Get repository with owner info
+            from models import Repository, User
+            result = await session.execute(
+                select(Repository, User)
+                .join(User, Repository.owner_id == User.id)
+                .where(Repository.id == repo_id)
+            )
+            row = result.one_or_none()
+            
+            if not row:
+                logger.error("Repository not found for scan", repo_id=repo_id)
+                return
+            
+            repo, user = row
+            
+            # Create scan job
+            scan_job = ScanJob(
+                repository_id=repo_id,
+                trigger_type="webhook",
+                branch=repo.default_branch or "main",
+                scanners_used=["trivy", "github_advisory"] if user.github_token else ["trivy"],
+                status="running",
+                started_at=datetime.utcnow()
+            )
+            session.add(scan_job)
+            await session.commit()
+            await session.refresh(scan_job)
+            
+            # Run scanners
+            if user.github_token:
+                scan_orchestrator.enable_github_advisory(user.github_token)
+            
+            results = await scan_orchestrator.scan_repository(
+                repo_url=repo.clone_url or repo.url,
+                branch=repo.default_branch or "main",
+                github_token=user.github_token
+            )
+            
+            # Aggregate findings
+            all_findings = scan_orchestrator.aggregate_findings(results)
+            
+            # Update scan job
+            scan_job.status = "completed"
+            scan_job.completed_at = datetime.utcnow()
+            scan_job.total_findings = len(all_findings)
+            scan_job.critical_count = sum(1 for f in all_findings if f.severity == Severity.CRITICAL)
+            scan_job.high_count = sum(1 for f in all_findings if f.severity == Severity.HIGH)
+            scan_job.medium_count = sum(1 for f in all_findings if f.severity == Severity.MEDIUM)
+            scan_job.low_count = sum(1 for f in all_findings if f.severity == Severity.LOW)
+            
+            # Update repo last scan time
             repo.last_scan_at = datetime.utcnow()
-            await db.commit()
-        
-        logger.info("Repository scan completed", repo_id=repo_id)
-        
-    except Exception as e:
-        logger.error("Repository scan failed", repo_id=repo_id, error=str(e))
+            
+            # Store findings as vulnerabilities
+            for finding in all_findings:
+                vuln = Vulnerability(
+                    repository_id=repo_id,
+                    scan_job_id=scan_job.id,
+                    cve_id=finding.cve_id,
+                    title=finding.title,
+                    description=finding.description,
+                    severity=finding.severity.value,
+                    package_name=finding.package_name,
+                    current_version=finding.installed_version,
+                    fixed_version=finding.fixed_version,
+                    file_path=finding.file_path,
+                    status="open"
+                )
+                session.add(vuln)
+            
+            await session.commit()
+            
+            logger.info(
+                "Repository scan completed",
+                repo_id=repo_id,
+                scan_job_id=scan_job.id,
+                findings=len(all_findings),
+                critical=scan_job.critical_count,
+                high=scan_job.high_count
+            )
+            
+        except Exception as e:
+            logger.error("Repository scan failed", repo_id=repo_id, error=str(e))
+            
+            # Try to update scan job as failed
+            try:
+                result = await session.execute(
+                    select(ScanJob).where(ScanJob.repository_id == repo_id).order_by(ScanJob.created_at.desc())
+                )
+                scan_job = result.scalar_one_or_none()
+                if scan_job:
+                    scan_job.status = "failed"
+                    scan_job.completed_at = datetime.utcnow()
+                    scan_job.error_message = str(e)
+                    await session.commit()
+            except:
+                pass
 
 
 @router.post("/repos/{repo_id}/webhook/register")
