@@ -47,6 +47,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Conversation history (local dev only)
+Raw File.txt
+*.conversation
+*.chat_history
+
 # Next.js
 .next/
 out/
