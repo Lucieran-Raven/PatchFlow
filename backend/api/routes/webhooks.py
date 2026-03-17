@@ -53,7 +53,7 @@ async def github_webhook(
     if not repo.webhook_secret:
         raise HTTPException(status_code=400, detail="Webhook not configured for this repository")
     
-    # Read raw payload
+    # Read raw payload once
     payload_bytes = await request.body()
     
     # Verify signature
@@ -63,8 +63,9 @@ async def github_webhook(
         logger.warning("Invalid webhook signature", repo_id=repo_id, delivery_id=x_github_delivery)
         raise HTTPException(status_code=401, detail="Invalid signature")
     
-    # Parse payload
-    payload = await request.json()
+    # Parse payload from already-read bytes
+    import json
+    payload = json.loads(payload_bytes)
     
     # Extract push event details
     ref = payload.get("ref")
