@@ -82,6 +82,20 @@ async def get_current_user(
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Register a new user."""
+    # Validate password strength
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    # Check for common weak patterns
+    if user_data.password.lower() in ['password', '12345678', 'qwerty123']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is too common or weak"
+        )
+    
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
         raise HTTPException(
@@ -93,7 +107,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
     user = User(
         email=user_data.email,
         name=user_data.name,
-        # Store hashed password if needed
+        hashed_password=hashed_password
     )
     db.add(user)
     await db.commit()
@@ -106,7 +120,7 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == user_data.email))
     user = result.scalar_one_or_none()
     
-    if not user or not pwd_context.verify(user_data.password, "stored_hash"):
+    if not user or not user.hashed_password or not pwd_context.verify(user_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password"

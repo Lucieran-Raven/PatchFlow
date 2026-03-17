@@ -1,11 +1,11 @@
 from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import structlog
 
 from core.config import settings
 from api.routes import auth, health, repositories, vulnerabilities, agents, github, webhooks, scanner
 from core.database import init_db
+from core.security_middleware import add_security_middleware
 
 logger = structlog.get_logger()
 
@@ -21,17 +21,13 @@ app = FastAPI(
     title="PatchFlow API",
     description="Autonomous AI Security Remediation Platform",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs" if not settings.ENVIRONMENT == "production" else None,
+    redoc_url="/redoc" if not settings.ENVIRONMENT == "production" else None,
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Add comprehensive security middleware
+add_security_middleware(app)
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
