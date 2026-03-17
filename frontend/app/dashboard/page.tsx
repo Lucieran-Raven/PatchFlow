@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Github, LogOut, Loader2, Webhook, Bell, Scan } from "lucide-react";
+import { Shield, Github, LogOut, Loader2, Webhook, Bell, Scan, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [webhookLoading, setWebhookLoading] = useState<string | null>(null);
   const [webhookEvents, setWebhookEvents] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
+  const [triageLoading, setTriageLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("patchflow_token");
@@ -141,6 +142,34 @@ export default function DashboardPage() {
     } catch (e) {
       console.error("Failed to fetch vulnerabilities:", e);
     }
+  };
+
+  const triggerTriage = async (vulnId: string) => {
+    if (!token) return;
+    setTriageLoading(vulnId);
+    try {
+      const res = await fetch(`http://localhost:8000/agents/vulnerabilities/${vulnId}/triage`, {
+        method: "POST",
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "already_triaged") {
+          alert(`Already triaged at ${new Date(data.triaged_at).toLocaleString()}`);
+        } else {
+          alert(`✅ AI Triage started! Task ID: ${data.task_id}`);
+        }
+      } else {
+        const err = await res.text();
+        alert(`Triage failed: ${res.status} - ${err}`);
+      }
+    } catch (e) {
+      alert(`Error: ${e}`);
+    }
+    setTriageLoading(null);
   };
 
   if (!token) {
@@ -362,6 +391,27 @@ export default function DashboardPage() {
                     {vuln.description && (
                       <div className="text-gray-500 text-xs mt-1 line-clamp-2">{vuln.description}</div>
                     )}
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 text-xs px-2"
+                        onClick={() => triggerTriage(vuln.id)}
+                        disabled={triageLoading === vuln.id}
+                      >
+                        {triageLoading === vuln.id ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Brain className="h-3 w-3 mr-1" />
+                        )}
+                        AI Triage
+                      </Button>
+                      {vuln.triaged && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                          Triaged ✓
+                        </span>
+                      )}
+                    </div>
                     <div className="text-gray-400 text-xs mt-1">
                       Detected: {vuln.detected_at ? new Date(vuln.detected_at).toLocaleDateString() : 'Unknown'}
                     </div>
