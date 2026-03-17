@@ -26,6 +26,9 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
 )
 
+# Export alias for convenience
+async_session_maker = AsyncSessionLocal
+
 Base = declarative_base()
 
 async def init_db():
