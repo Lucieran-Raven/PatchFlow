@@ -44,7 +44,10 @@ async def check_database_health(db: AsyncSession) -> ComponentStatus:
     
     try:
         result = await db.execute(text("SELECT 1"))
-        await result.scalar_one()
+        scalar_result = result.scalar_one()
+        # Handle both coroutine and direct value cases
+        if hasattr(scalar_result, '__await__'):
+            await scalar_result
         
         response_time = (time.time() - start) * 1000
         

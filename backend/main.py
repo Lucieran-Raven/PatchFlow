@@ -22,8 +22,8 @@ app = FastAPI(
     description="Autonomous AI Security Remediation Platform",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs" if not settings.ENVIRONMENT == "production" else None,
-    redoc_url="/redoc" if not settings.ENVIRONMENT == "production" else None,
+    docs_url="/docs" if not (settings.ENVIRONMENT == "production" and not settings.DOCKER_ENV) else None,
+    redoc_url="/redoc" if not (settings.ENVIRONMENT == "production" and not settings.DOCKER_ENV) else None,
 )
 
 # Add comprehensive security middleware

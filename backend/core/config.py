@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import List
+import json
 
 class Settings(BaseSettings):
     """Application configuration."""
@@ -7,6 +8,8 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "PatchFlow"
     DEBUG: bool = False
+    ENVIRONMENT: str = "development"
+    DOCKER_ENV: bool = False
     
     # Database
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/patchflow"
@@ -19,8 +22,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://patchflow.ai"]
+    # CORS - stored as comma-separated string, parsed to list
+    CORS_ORIGINS: str = "http://localhost:3000,https://patchflow.ai"
     FRONTEND_URL: str = "http://localhost:3000"
     
     # GitHub
@@ -47,5 +50,9 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
+
+    def get_cors_origins(self) -> List[str]:
+        """Parse CORS_ORIGINS from comma-separated string to list."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 settings = Settings()

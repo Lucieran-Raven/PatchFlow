@@ -14,6 +14,7 @@ import time
 import structlog
 from typing import Dict, List, Tuple
 from collections import defaultdict
+from core.config import settings
 
 logger = structlog.get_logger()
 
@@ -58,7 +59,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         
@@ -152,10 +153,10 @@ def add_security_middleware(app):
         allowed_hosts=["localhost", "127.0.0.1", "*.localhost", "*.patchflow.io"]
     )
     
-    # CORS
+    # CORS - use settings
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "https://patchflow.io"],
+        allow_origins=settings.get_cors_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],

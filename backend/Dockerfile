@@ -45,9 +45,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy application code
 COPY . .
 
-# Create non-root user for security
+# Create non-root user for security and set up data directory
 RUN groupadd -r patchflow && useradd -r -g patchflow patchflow && \
-    chown -R patchflow:patchflow /app
+    mkdir -p /app/data && \
+    chown -R patchflow:patchflow /app && \
+    chmod 755 /app/data
 
 # Switch to non-root user
 USER patchflow
