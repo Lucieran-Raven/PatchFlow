@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import structlog
 
 from core.config import settings
-from api.routes import auth, health, repositories, vulnerabilities, agents, github, webhooks, scanner, pr_automation
+from api.routes import auth, health, repositories, vulnerabilities, agents, github, webhooks, scanner, pr_automation, dashboard
 from core.database import init_db
 from core.security_middleware import add_security_middleware
 
@@ -39,6 +39,7 @@ app.include_router(repositories.router, prefix="/repositories", tags=["Repositor
 app.include_router(vulnerabilities.router, prefix="/vulnerabilities", tags=["Vulnerabilities"])
 app.include_router(agents.router, prefix="/agents", tags=["Agents"])
 app.include_router(pr_automation.router, prefix="/pr", tags=["PR Automation"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 
 @app.get("/")
 async def root():
