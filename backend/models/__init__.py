@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=True)
     full_name = Column(String(255), nullable=True)
+    hashed_password = Column(String(255), nullable=True)  # For email/password auth
     github_id = Column(String(255), unique=True, nullable=True)
     github_username = Column(String(255), nullable=True)
     github_token = Column(Text, nullable=True)  # Encrypted in production
