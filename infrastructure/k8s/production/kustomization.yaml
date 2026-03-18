@@ -4,11 +4,7 @@ kind: Kustomization
 namespace: patchflow
 
 resources:
-  - namespace.yaml
-  - configmap.yaml
-  - backend.yaml
-  - frontend.yaml
-  - ingress.yaml
+  - ../base/
 
 images:
   - name: patchflow/backend

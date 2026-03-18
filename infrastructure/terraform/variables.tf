@@ -124,6 +124,19 @@ variable "domain_name" {
   default     = "patchflow.ai"
 }
 
+variable "grafana_admin_user" {
+  description = "Grafana admin username"
+  type        = string
+  default     = "admin"
+  sensitive   = true
+}
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password"
+  type        = string
+  sensitive   = true
+}
+
 variable "enable_waf" {
   description = "Enable AWS WAF"
   type        = bool

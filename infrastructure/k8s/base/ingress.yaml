@@ -4,11 +4,10 @@ metadata:
   name: patchflow-ingress
   namespace: patchflow
   annotations:
-    kubernetes.io/ingress.class: "alb"
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
     alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
     alb.ingress.kubernetes.io/healthcheck-path: /health
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
@@ -17,8 +16,14 @@ metadata:
       deletion_protection.enabled=true,
       routing.http2.enabled=true,
       idle_timeout.timeout_seconds=60
-    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-east-1:ACCOUNT_ID:regional/webacl/patchflow-acl/ACL_ID
+    external-dns.alpha.kubernetes.io/hostname: "app.patchflow.ai,api.patchflow.ai"
 spec:
+  ingressClassName: alb
+  tls:
+  - hosts:
+    - app.patchflow.ai
+    - api.patchflow.ai
+    secretName: patchflow-tls-cert
   rules:
   - host: app.patchflow.ai
     http:
@@ -29,31 +34,63 @@ spec:
           service:
             name: patchflow-frontend
             port:
-              number: 80
+              number: 3000
   - host: api.patchflow.ai
     http:
       paths:
-      - path: /
+      - path: /api/v1
         pathType: Prefix
         backend:
           service:
             name: patchflow-backend
             port:
-              number: 80
+              number: 8000
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: patchflow-backend
+            port:
+              number: 8000
+      - path: /openapi.json
+        pathType: Exact
+        backend:
+          service:
+            name: patchflow-backend
+            port:
+              number: 8000
 ---
-# Internal ingress for agent communication
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: patchflow-tls
+  namespace: patchflow
+spec:
+  secretName: patchflow-tls-cert
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - app.patchflow.ai
+  - api.patchflow.ai
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: patchflow-internal-ingress
   namespace: patchflow-agents
   annotations:
-    kubernetes.io/ingress.class: "alb"
     alb.ingress.kubernetes.io/scheme: internal
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    external-dns.alpha.kubernetes.io/hostname: "agents.patchflow.internal"
 spec:
+  ingressClassName: alb
+  tls:
+  - hosts:
+    - agents.patchflow.internal
+    secretName: agents-tls-cert
   rules:
   - host: agents.patchflow.internal
     http:
@@ -65,3 +102,16 @@ spec:
             name: agent-orchestrator
             port:
               number: 8080
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: agents-tls
+  namespace: patchflow-agents
+spec:
+  secretName: agents-tls-cert
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - agents.patchflow.internal

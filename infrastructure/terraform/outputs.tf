@@ -73,3 +73,32 @@ output "terraform_dynamodb_table" {
   description = "DynamoDB table for state locking"
   value       = aws_dynamodb_table.terraform_locks.id
 }
+
+# ------------------------------------------------------------------------------
+# EKS Add-ons Outputs (Phase 1 Week 2-3)
+# ------------------------------------------------------------------------------
+
+output "aws_load_balancer_controller_role_arn" {
+  description = "IAM role ARN for AWS Load Balancer Controller"
+  value       = module.aws_load_balancer_controller_irsa.iam_role_arn
+}
+
+output "external_dns_role_arn" {
+  description = "IAM role ARN for External DNS"
+  value       = module.external_dns_irsa.iam_role_arn
+}
+
+output "cert_manager_role_arn" {
+  description = "IAM role ARN for Cert Manager"
+  value       = module.cert_manager_irsa.iam_role_arn
+}
+
+output "grafana_endpoint" {
+  description = "Grafana internal endpoint (use kubectl port-forward to access)"
+  value       = "http://prometheus-grafana.patchflow-monitoring.svc.cluster.local"
+}
+
+output "prometheus_endpoint" {
+  description = "Prometheus internal endpoint"
+  value       = "http://prometheus-kube-prometheus-prometheus.patchflow-monitoring.svc.cluster.local:9090"
+}
