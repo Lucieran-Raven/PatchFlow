@@ -22,4 +22,4 @@ structlog==24.1.0
 psutil==5.9.8
 svix==1.21.0
 stripe==8.9.0
-clerk-sdk-python==1.0.0
+clerk-backend-api==5.0.2

@@ -67,6 +67,8 @@ jobs:
       run: npm ci
     - working-directory: ./frontend
       run: npm run build
+      env:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cHJvbXB0LXRhcnBvbi0zMC5jbGVyay5hY2NvdW50cy5kZXYk
 
   security-scan:
     runs-on: ubuntu-latest
