@@ -2,21 +2,88 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Github, LogOut, Loader2, Webhook, Bell, Scan, Brain } from "lucide-react";
+import { 
+  Shield, Github, LogOut, Loader2, Webhook, Bell, Scan, Brain, 
+  TrendingUp, AlertTriangle, CheckCircle, GitPullRequest, 
+  Activity, BarChart3, PieChart, ArrowUpRight, ArrowDownRight 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+interface DashboardStats {
+  total_vulnerabilities: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  fixed_count: number;
+  open_count: number;
+  prs_created: number;
+  prs_merged: number;
+  total_repositories: number;
+  scanned_repositories: number;
+  total_scans: number;
+  scans_this_week: number;
+}
+
+interface SeverityDistribution {
+  severity: string;
+  count: number;
+  percentage: number;
+}
+
+interface RepositoryHealth {
+  repository_id: string;
+  repository_name: string;
+  total_vulns: number;
+  critical_vulns: number;
+  high_vulns: number;
+  last_scan_at: string | null;
+  health_score: number;
+  fix_rate: number;
+}
+
+interface FixMetrics {
+  total_fixes_generated: number;
+  fixes_by_cwe: { cwe_id: string; count: number }[];
+  average_fix_confidence: number;
+  prs_created: number;
+  prs_merged: number;
+  merge_rate: number;
+}
+
+interface Activity {
+  id: string;
+  type: string;
+  title: string;
+  severity: string;
+  repository: string;
+  timestamp: string;
+  status: string;
+  pr_url: string | null;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Stats
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [severityDist, setSeverityDist] = useState<SeverityDistribution[]>([]);
+  const [repoHealth, setRepoHealth] = useState<RepositoryHealth[]>([]);
+  const [fixMetrics, setFixMetrics] = useState<FixMetrics | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  
+  // Existing states
   const [syncing, setSyncing] = useState(false);
   const [repos, setRepos] = useState<any[]>([]);
-  const [scanLoading, setScanLoading] = useState<string | null>(null);
-  const [scanResults, setScanResults] = useState<any>(null);
   const [vulnerabilities, setVulnerabilities] = useState<any[]>([]);
+  const [scanLoading, setScanLoading] = useState<string | null>(null);
   const [webhookLoading, setWebhookLoading] = useState<string | null>(null);
   const [webhookEvents, setWebhookEvents] = useState<any[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [triageLoading, setTriageLoading] = useState<string | null>(null);
+  const [scanResults, setScanResults] = useState<any>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("patchflow_token");
@@ -24,8 +91,41 @@ export default function DashboardPage() {
       router.push("/");
     } else {
       setToken(stored);
+      fetchDashboardData(stored);
     }
   }, [router]);
+
+  const fetchDashboardData = async (authToken: string) => {
+    try {
+      const [statsRes, severityRes, repoRes, fixRes, activityRes] = await Promise.all([
+        fetch("http://localhost:8000/dashboard/stats", {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        }),
+        fetch("http://localhost:8000/dashboard/severity-distribution", {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        }),
+        fetch("http://localhost:8000/dashboard/repository-health", {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        }),
+        fetch("http://localhost:8000/dashboard/fix-metrics", {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        }),
+        fetch("http://localhost:8000/dashboard/recent-activity", {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        })
+      ]);
+
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (severityRes.ok) setSeverityDist((await severityRes.json()).distribution);
+      if (repoRes.ok) setRepoHealth((await repoRes.json()).repositories);
+      if (fixRes.ok) setFixMetrics(await fixRes.json());
+      if (activityRes.ok) setActivities((await activityRes.json()).activities);
+    } catch (e) {
+      console.error("Failed to fetch dashboard data:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("patchflow_token");
@@ -44,16 +144,29 @@ export default function DashboardPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        console.log("API Response:", data);
         setRepos(data.repositories || []);
-      } else {
-        const err = await res.text();
-        alert(`Failed: ${res.status} - ${err}`);
+        fetchDashboardData(token);
       }
     } catch (e) {
-      alert(`Error: ${e}`);
+      console.error("Sync failed:", e);
     }
     setSyncing(false);
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case "critical": return "bg-red-500";
+      case "high": return "bg-orange-500";
+      case "medium": return "bg-yellow-500";
+      case "low": return "bg-blue-500";
+      default: return "bg-gray-500";
+    }
+  };
+
+  const getHealthScoreColor = (score: number) => {
+    if (score >= 80) return "text-green-600 bg-green-50";
+    if (score >= 60) return "text-yellow-600 bg-yellow-50";
+    return "text-red-600 bg-red-50";
   };
 
   const registerWebhook = async (repoId: string) => {
