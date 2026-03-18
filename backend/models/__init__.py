@@ -9,10 +9,11 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    clerk_id = Column(String(255), unique=True, nullable=True, index=True)  # Clerk user ID
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=True)
     full_name = Column(String(255), nullable=True)
-    hashed_password = Column(String(255), nullable=True)  # For email/password auth
+    hashed_password = Column(String(255), nullable=True)  # For email/password auth (legacy)
     github_id = Column(String(255), unique=True, nullable=True)
     github_username = Column(String(255), nullable=True)
     github_token = Column(Text, nullable=True)  # Encrypted in production

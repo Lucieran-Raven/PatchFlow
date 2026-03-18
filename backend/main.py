@@ -4,6 +4,7 @@ import structlog
 
 from core.config import settings
 from api.routes import auth, health, repositories, vulnerabilities, agents, github, webhooks, scanner, pr_automation, dashboard
+from api.routes.webhooks_clerk import router as clerk_webhook_router
 from core.database import init_db
 from core.security_middleware import add_security_middleware
 
@@ -32,6 +33,7 @@ add_security_middleware(app)
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(clerk_webhook_router, prefix="/webhooks/clerk", tags=["Clerk Webhooks"])
 app.include_router(github.router, prefix="/auth/github", tags=["GitHub Integration"])
 app.include_router(webhooks.router, prefix="/webhooks/github", tags=["GitHub Webhooks"])
 app.include_router(scanner.router, prefix="/scanner", tags=["Vulnerability Scanning"])
@@ -40,6 +42,10 @@ app.include_router(vulnerabilities.router, prefix="/vulnerabilities", tags=["Vul
 app.include_router(agents.router, prefix="/agents", tags=["Agents"])
 app.include_router(pr_automation.router, prefix="/pr", tags=["PR Automation"])
 app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+
+# Stripe routes (Phase 1 Week 3-4)
+from api.routes import stripe as stripe_router
+app.include_router(stripe_router.router, prefix="/stripe", tags=["Payments"])
 
 @app.get("/")
 async def root():

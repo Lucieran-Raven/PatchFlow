@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "password"
     
+    # Clerk Authentication
+    CLERK_PUBLISHABLE_KEY: str = ""
+    CLERK_SECRET_KEY: str = ""
+    CLERK_DOMAIN: str = "clerk.patchflow.ai"  # e.g., your-domain.clerk.accounts.dev
+    CLERK_AUDIENCE: str = ""  # JWT audience, usually your frontend URL
+    CLERK_WEBHOOK_SECRET: str = ""  # For verifying webhook signatures
+    
     class Config:
         env_file = ".env"
 
