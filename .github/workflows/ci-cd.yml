@@ -50,6 +50,7 @@ jobs:
     - working-directory: ./backend
       run: pytest tests/ -v
       env:
+        PYTHONPATH: .
         DATABASE_URL: postgresql://test:test@localhost:5432/patchflow_test
         REDIS_URL: redis://localhost:6379/0
 
