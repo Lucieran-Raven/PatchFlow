@@ -53,6 +53,9 @@ jobs:
         PYTHONPATH: .
         DATABASE_URL: postgresql://test:test@localhost:5432/patchflow_test
         REDIS_URL: redis://localhost:6379/0
+        CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -106,6 +109,11 @@ jobs:
       env:
         REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         TAG: ${{ github.sha }}
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cHJvbXB0LXRhcnBvbi0zMC5jbGVyay5hY2NvdW50cy5kZXYk
+        CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
       run: |
         docker build -t $REGISTRY/patchflow-backend:$TAG ./backend
         docker push $REGISTRY/patchflow-backend:$TAG
