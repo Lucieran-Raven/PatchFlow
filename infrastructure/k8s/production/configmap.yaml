@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: patchflow-config
+  namespace: patchflow
+data:
+  # Application configuration
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  
+  # Database configuration (will be overridden by secrets)
+  DATABASE_HOST: "patchflow-production-postgres.cluster-xxx.us-east-1.rds.amazonaws.com"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "patchflow"
+  
+  # Redis configuration
+  REDIS_HOST: "patchflow-production-redis.xxx.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  
+  # API configuration
+  API_PORT: "8000"
+  API_WORKERS: "4"
+  
+  # Agent configuration
+  AGENT_TIMEOUT: "30"
+  MAX_CONCURRENT_AGENTS: "10"
+  
+  # GitHub integration
+  GITHUB_API_URL: "https://api.github.com"
+  
+  # Security settings
+  CORS_ORIGINS: "https://patchflow.ai,https://app.patchflow.ai"
+  
+  # Feature flags
+  ENABLE_AUTO_REMEDIATION: "true"
+  ENABLE_SLACK_NOTIFICATIONS: "true"
+  ENABLE_EMAIL_NOTIFICATIONS: "true"
+  
+  # Rollback monitoring
+  ROLLBACK_MONITORING_DURATION: "24h"
+  ROLLBACK_ERROR_THRESHOLD: "0.1"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patchflow-secrets
+  namespace: patchflow
+type: Opaque
+stringData:
+  # Database credentials (managed by AWS Secrets Manager in production)
+  DATABASE_URL: "postgresql://patchflow_admin:PASSWORD@host:5432/patchflow"
+  REDIS_URL: "rediss://:PASSWORD@host:6379/0"
+  
+  # JWT secret
+  JWT_SECRET: "placeholder-change-in-production"
+  
+  # GitHub OAuth
+  GITHUB_CLIENT_ID: "placeholder"
+  GITHUB_CLIENT_SECRET: "placeholder"
+  
+  # API Keys
+  OPENAI_API_KEY: "placeholder"
+  ANTHROPIC_API_KEY: "placeholder"
+  SNYK_API_KEY: "placeholder"
+  
+  # Stripe
+  STRIPE_API_KEY: "placeholder"
+  STRIPE_WEBHOOK_SECRET: "placeholder"
+  
+  # Auth0/Clerk
+  AUTH0_DOMAIN: "placeholder"
+  AUTH0_CLIENT_ID: "placeholder"
+  AUTH0_CLIENT_SECRET: "placeholder"
+  
+  # Slack
+  SLACK_BOT_TOKEN: "placeholder"
+  SLACK_SIGNING_SECRET: "placeholder"
+  
+  # Email
+  SENDGRID_API_KEY: "placeholder"

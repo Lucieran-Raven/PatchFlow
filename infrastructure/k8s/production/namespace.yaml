@@ -1,0 +1,28 @@
+# Kubernetes Base Manifests for PatchFlow
+# These are the base configurations applied to all environments
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: patchflow
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/name: patchflow
+    app.kubernetes.io/component: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: patchflow-agents
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/name: patchflow-agents
+    app.kubernetes.io/component: ai-agents
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: patchflow-monitoring
+  labels:
+    app.kubernetes.io/name: patchflow-monitoring
+    app.kubernetes.io/component: observability

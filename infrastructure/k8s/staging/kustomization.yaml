@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: patchflow
+
+resources:
+  - ../base/namespace.yaml
+  - ../base/configmap.yaml
+  - ../base/backend.yaml
+  - ../base/frontend.yaml
+
+images:
+  - name: patchflow/backend
+    newTag: staging
+  - name: patchflow/frontend
+    newTag: staging
+
+patches:
+  - target:
+      kind: Deployment
+      name: patchflow-backend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+  - target:
+      kind: Deployment
+      name: patchflow-frontend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
