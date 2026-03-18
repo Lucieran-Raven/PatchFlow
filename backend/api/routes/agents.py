@@ -17,7 +17,7 @@ from core.database import get_db
 from models import User, Vulnerability, Repository, ScanJob
 from api.routes.auth import get_current_user as get_current_user_from_token
 from agents.base_agent import AgentContext, AgentTask, AgentPriority, agent_orchestrator, AgentRegistry
-from agents.triage_agent import TriageAgent
+from agents.code_fix_agent import CodeFixAgent
 
 logger = structlog.get_logger()
 router = APIRouter(tags=["AI Agents"])
@@ -366,4 +366,291 @@ async def get_orchestrator_stats(
         "orchestrator_stats": stats,
         "registered_agents": AgentRegistry.list_agents(),
         "current_time": datetime.utcnow().isoformat()
+    }
+
+
+@router.post("/vulnerabilities/{vuln_id}/fix")
+async def generate_fix(
+    vuln_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user_from_token),
+    db: AsyncSession = Depends(get_db)
+):
+    """Trigger AI code fix generation for a vulnerability."""
+    
+    # Get vulnerability with repository info
+    result = await db.execute(
+        select(Vulnerability, Repository)
+        .join(Repository, Vulnerability.repository_id == Repository.id)
+        .where(Vulnerability.id == vuln_id, Repository.owner_id == current_user.id)
+    )
+    row = result.one_or_none()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+    
+    vuln, repo = row
+    
+    # Check if already has a fix
+    if vuln.fix_generated:
+        return {
+            "status": "already_generated",
+            "vulnerability_id": vuln_id,
+            "fix_type": "dependency_upgrade" if vuln.package_name else "code_change",
+            "message": "Fix already generated for this vulnerability"
+        }
+    
+    # Prepare payload for code fix agent
+    payload = {
+        "vulnerability": {
+            "id": vuln.id,
+            "cve_id": vuln.cve_id,
+            "cwe_id": vuln.cwe_id,
+            "title": vuln.title,
+            "description": vuln.description,
+            "severity": vuln.severity,
+            "package_name": vuln.package_name,
+            "current_version": vuln.current_version,
+            "fixed_version": vuln.fixed_version,
+            "file_path": vuln.file_path,
+            "line_start": vuln.line_start,
+            "line_end": vuln.line_end,
+        },
+        "repository": {
+            "id": repo.id,
+            "name": repo.name,
+            "full_name": repo.full_name,
+            "is_private": repo.is_private,
+            "language": repo.language,
+            "default_branch": repo.default_branch,
+            "clone_url": repo.clone_url,
+        }
+    }
+    
+    # Submit task to agent orchestrator
+    task_id = await agent_orchestrator.submit_task(
+        agent_type="code_fix",
+        payload=payload,
+        priority=AgentPriority.HIGH if vuln.severity in ["critical", "high"] else AgentPriority.MEDIUM
+    )
+    
+    # Start processing in background
+    background_tasks.add_task(run_fix_task, task_id, vuln_id, db)
+    
+    logger.info(
+        "Code fix task submitted",
+        task_id=task_id,
+        vuln_id=vuln_id,
+        user_id=current_user.id
+    )
+    
+    return {
+        "status": "queued",
+        "task_id": task_id,
+        "vulnerability_id": vuln_id,
+        "message": "AI code fix generation started"
+    }
+
+
+async def run_fix_task(task_id: str, vuln_id: str, db: AsyncSession):
+    """Run code fix task in background and save results."""
+    from core.database import async_session_maker
+    
+    async with async_session_maker() as session:
+        try:
+            # Get the agent
+            agent = AgentRegistry.get_agent("code_fix")
+            if not agent:
+                logger.error("Code fix agent not found")
+                return
+            
+            # Create task object (simplified for direct execution)
+            task = AgentTask(
+                id=task_id,
+                agent_type="code_fix",
+                payload={}
+            )
+            
+            # Get vulnerability data
+            result = await session.execute(
+                select(Vulnerability, Repository)
+                .join(Repository, Vulnerability.repository_id == Repository.id)
+                .where(Vulnerability.id == vuln_id)
+            )
+            row = result.one_or_none()
+            
+            if not row:
+                logger.error("Vulnerability not found for fix", vuln_id=vuln_id)
+                return
+            
+            vuln, repo = row
+            
+            # Create context
+            context = AgentContext(
+                task=task,
+                user_id=repo.owner_id,
+                repository_id=repo.id,
+                vulnerability_id=vuln_id
+            )
+            context.task.payload = {
+                "vulnerability": {
+                    "id": vuln.id,
+                    "cve_id": vuln.cve_id,
+                    "cwe_id": vuln.cwe_id,
+                    "title": vuln.title,
+                    "description": vuln.description,
+                    "severity": vuln.severity,
+                    "package_name": vuln.package_name,
+                    "current_version": vuln.current_version,
+                    "fixed_version": vuln.fixed_version,
+                    "file_path": vuln.file_path,
+                    "line_start": vuln.line_start,
+                    "line_end": vuln.line_end,
+                },
+                "repository": {
+                    "id": repo.id,
+                    "name": repo.name,
+                    "full_name": repo.full_name,
+                    "is_private": repo.is_private,
+                    "language": repo.language,
+                    "default_branch": repo.default_branch,
+                }
+            }
+            
+            # Run agent
+            result = await agent.run(context)
+            
+            # Update vulnerability with fix results
+            vuln.fix_generated = result.get("fix_generated", False)
+            vuln.fix_code = result.get("patched_code") or result.get("fix_code")
+            vuln.test_cases = "\n".join(result.get("test_cases", []))
+            
+            await session.commit()
+            
+            logger.info(
+                "Code fix completed",
+                vuln_id=vuln_id,
+                fix_generated=result.get("fix_generated"),
+                fix_type=result.get("fix_type"),
+                validation_passed=result.get("validation_passed")
+            )
+            
+        except Exception as e:
+            logger.error("Code fix task failed", vuln_id=vuln_id, error=str(e))
+
+
+@router.get("/vulnerabilities/{vuln_id}/fix")
+async def get_fix_result(
+    vuln_id: str,
+    current_user: User = Depends(get_current_user_from_token),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get AI code fix results for a vulnerability."""
+    
+    # Get vulnerability
+    result = await db.execute(
+        select(Vulnerability, Repository)
+        .join(Repository, Vulnerability.repository_id == Repository.id)
+        .where(Vulnerability.id == vuln_id, Repository.owner_id == current_user.id)
+    )
+    row = result.one_or_none()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+    
+    vuln, repo = row
+    
+    if not vuln.fix_generated:
+        return {
+            "vulnerability_id": vuln_id,
+            "status": "not_generated",
+            "message": "Code fix not yet generated. Use POST to generate."
+        }
+    
+    return {
+        "vulnerability_id": vuln_id,
+        "status": "generated",
+        "fix_type": "dependency_upgrade" if vuln.package_name else "code_change",
+        "fix_code": vuln.fix_code,
+        "test_cases": vuln.test_cases.split("\n") if vuln.test_cases else [],
+        "file_path": vuln.file_path,
+        "pr_url": vuln.pr_url,
+        "pr_number": vuln.pr_number,
+    }
+
+
+@router.post("/vulnerabilities/{vuln_id}/fix/regenerate")
+async def regenerate_fix(
+    vuln_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user_from_token),
+    db: AsyncSession = Depends(get_db)
+):
+    """Regenerate AI code fix for a vulnerability (allows retry)."""
+    
+    # Get vulnerability with repository info
+    result = await db.execute(
+        select(Vulnerability, Repository)
+        .join(Repository, Vulnerability.repository_id == Repository.id)
+        .where(Vulnerability.id == vuln_id, Repository.owner_id == current_user.id)
+    )
+    row = result.one_or_none()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+    
+    vuln, repo = row
+    
+    # Clear previous fix
+    vuln.fix_generated = False
+    vuln.fix_code = None
+    vuln.test_cases = None
+    await db.commit()
+    
+    # Re-trigger fix generation
+    payload = {
+        "vulnerability": {
+            "id": vuln.id,
+            "cve_id": vuln.cve_id,
+            "cwe_id": vuln.cwe_id,
+            "title": vuln.title,
+            "description": vuln.description,
+            "severity": vuln.severity,
+            "package_name": vuln.package_name,
+            "current_version": vuln.current_version,
+            "fixed_version": vuln.fixed_version,
+            "file_path": vuln.file_path,
+            "line_start": vuln.line_start,
+            "line_end": vuln.line_end,
+        },
+        "repository": {
+            "id": repo.id,
+            "name": repo.name,
+            "full_name": repo.full_name,
+            "is_private": repo.is_private,
+            "language": repo.language,
+            "default_branch": repo.default_branch,
+        }
+    }
+    
+    task_id = await agent_orchestrator.submit_task(
+        agent_type="code_fix",
+        payload=payload,
+        priority=AgentPriority.HIGH if vuln.severity in ["critical", "high"] else AgentPriority.MEDIUM
+    )
+    
+    background_tasks.add_task(run_fix_task, task_id, vuln_id, db)
+    
+    logger.info(
+        "Code fix regeneration started",
+        task_id=task_id,
+        vuln_id=vuln_id,
+        user_id=current_user.id
+    )
+    
+    return {
+        "status": "queued",
+        "task_id": task_id,
+        "vulnerability_id": vuln_id,
+        "message": "AI code fix regeneration started"
     }
