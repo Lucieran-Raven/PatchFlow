@@ -126,7 +126,8 @@ metadata:
   name: patchflow-backend
   namespace: patchflow
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/patchflow-backend-role
+    # IAM role ARN will be injected by Terraform or eksctl during cluster setup
+    eks.amazonaws.com/role-arn: "${IAM_ROLE_ARN}"
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

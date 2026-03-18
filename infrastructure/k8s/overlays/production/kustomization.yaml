@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: patchflow
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../base/configmap.yaml
+  - ../../base/backend.yaml
+  - ../../base/frontend.yaml
+  - ../../base/ingress.yaml
+
+patchesStrategicMerge:
+  - backend-patch.yaml
+  - frontend-patch.yaml
+  - configmap-patch.yaml
+
+images:
+  - name: patchflow/backend
+    newTag: latest
+  - name: patchflow/frontend
+    newTag: latest
