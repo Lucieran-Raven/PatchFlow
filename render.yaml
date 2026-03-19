@@ -64,21 +64,3 @@ services:
       - key: NEXT_PUBLIC_API_URL
         value: https://patchflow-backend.onrender.com
     rootDir: frontend
-
-  - type: pserv
-    name: patchflow-worker
-    runtime: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: celery -A tasks worker --loglevel=info
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: patchflow-redis
-          property: connectionString
-    rootDir: backend
