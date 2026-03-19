@@ -3,6 +3,8 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+export const dynamic = 'force-static';
+
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
