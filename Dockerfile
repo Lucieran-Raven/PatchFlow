@@ -1,66 +1,36 @@
 # PatchFlow Backend Dockerfile (Root)
-# This Dockerfile is used by Render.com for deployment
-# It builds the backend service from the backend/ directory
+# Simplified single-stage build for Render.com
 
-# Stage 1: Build stage
-FROM python:3.12-slim as builder
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for building Python packages
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy and install Python dependencies from backend
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Stage 2: Production stage
-FROM python:3.12-slim
-
-WORKDIR /app
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     git \
     curl \
-    gnupg \
-    lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Trivy for container scanning
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+# Copy requirements first for better caching
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Copy application code
+COPY backend/ /app/
 
-# Copy application code from backend directory
-COPY backend/ .
+# Create data directory
+RUN mkdir -p /app/data
 
-# Create non-root user for security
-RUN groupadd -r patchflow && useradd -r -g patchflow patchflow && \
-    mkdir -p /app/data && \
-    chown -R patchflow:patchflow /app && \
-    chmod 755 /app/data
-
-# Switch to non-root user
-USER patchflow
-
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health/live || exit 1
 
 # Expose port
 EXPOSE 8000
 
-# Run with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers"]
+# Run with uvicorn (single worker for free tier)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
