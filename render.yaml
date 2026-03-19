@@ -9,9 +9,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DATABASE_URL
-        fromDatabase:
-          name: patchflow-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
@@ -77,18 +75,10 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: DATABASE_URL
-        fromDatabase:
-          name: patchflow-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
         fromService:
           type: redis
           name: patchflow-redis
           property: connectionString
     rootDir: backend
-
-databases:
-  - name: patchflow-db
-    plan: free
-    databaseName: patchflow
-    user: patchflow
